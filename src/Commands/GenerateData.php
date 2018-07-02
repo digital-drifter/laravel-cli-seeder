@@ -204,14 +204,14 @@ class GenerateData extends Command
 
         $this->generateData($count, $data);
 
-        $action = $this->choice('Data prepared. Would you like to:', ['Insert', 'Modify', 'Discard']);
+        $action = $this->choice('Data prepared. Would you like to:', ['Insert', 'Review', 'Discard']);
 
         switch ($action) {
             case 'Insert':
-                $this->insertData($count, $data);
+                $this->insert($count, $data);
                 break;
-            case 'Modify':
-                $this->modifyData($data);
+            case 'Review':
+                $this->review($data);
                 break;
             case 'Discard':
                 $this->info('Discarded all data. No records added. Exiting.');
@@ -226,22 +226,39 @@ class GenerateData extends Command
     /**
      * @param array $data
      */
-    private function modifyData(array $data)
+    private function review(array $data)
     {
         $rows = array_map(function ($row) {
             return array_map(function ($column) {
-                return is_string($column) && strlen($column) > 10 ? substr($column, 0, 10) : $column;
+                return is_string($column) && strlen($column) > 10 ? substr($column, 0, 10) . '...' : $column;
             }, $row);
         }, $data);
 
-        $this->table($this->columns->pluck('name')->toArray(), $rows);
+        $this->table($this->columns->pluck('column')->toArray(), $rows);
+
+        $id = $this->choice('Modify Row', array_map(function ($row) {
+            return $row[0];
+        }, $rows));
+
+        $row = array_first($rows, function ($row) use ($id) {
+            return $row[0] === $id;
+        });
+
+        $this->rowDetails($row);
+    }
+
+    private function rowDetails(array $row)
+    {
+        $rows = array_combine($this->columns->pluck('column')->toArray(), $row);
+
+        $this->table(['Column', 'Value'], $rows);
     }
 
     /**
      * @param int $count
      * @param array $data
      */
-    private function insertData(int $count, array $data)
+    private function insert(int $count, array $data)
     {
         DB::table($this->table)->insert($data);
 
