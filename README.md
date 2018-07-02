@@ -14,3 +14,5 @@ composer required digital-drifter/laravel-cli-seeder
 php artisan cli-seeder:generate
 ```
 
+# Configuration
+
