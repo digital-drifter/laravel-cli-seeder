@@ -204,7 +204,7 @@ class GenerateData extends Command
 
         $this->generateData($count, $data);
 
-        $action = $this->choice('Ready. (I)nsert, (M)odify, (D)iscard?', ['I', 'M', 'D']);
+        $action = $this->choice('Data prepared. Would you like to:', ['Insert records', 'Modify data', 'Discard']);
 
         switch ($action) {
             case 'I':
@@ -214,7 +214,8 @@ class GenerateData extends Command
                 $this->modifyData($data);
                 break;
             case 'D':
-                $this->insertData($count, $data);
+                $this->info('Discarded all data. No records added. Exiting.');
+                exit();
                 break;
             default:
                 $this->error('Invalid choice. Exiting.');
@@ -224,7 +225,7 @@ class GenerateData extends Command
 
     private function modifyData(array $data)
     {
-        $this->table($this->columns->toArray(), $data);
+        $this->table($this->columns->pluck('name')->toArray(), $data);
 
     }
 
