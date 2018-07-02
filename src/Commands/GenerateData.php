@@ -16,6 +16,12 @@ use Illuminate\Support\Str;
 
 class GenerateData extends Command
 {
+    const POST_GENERATE_ACTIONS = [
+        'Insert Now',
+        'Review and Edit',
+        'Discard and Exit'
+    ];
+
     /**
      * The name and signature of the console command.
      *
@@ -229,16 +235,16 @@ class GenerateData extends Command
      */
     private function postGenerate()
     {
-        $action = $this->choice('Data prepared. Would you like to:', ['Insert Now', 'Review and Edit', 'Discard and Exit']);
+        $action = $this->choice('Data prepared. Would you like to:', static::POST_GENERATE_ACTIONS);
 
         switch ($action) {
-            case 'Insert Now':
+            case static::POST_GENERATE_ACTIONS[0]:
                 $this->insert();
                 break;
-            case 'Review and Edit':
+            case static::POST_GENERATE_ACTIONS[1]:
                 $this->review();
                 break;
-            case 'Discard and Exit':
+            case static::POST_GENERATE_ACTIONS[2]:
                 $this->info('Discarded all data. No records added. Exiting.');
                 exit();
                 break;
@@ -249,6 +255,8 @@ class GenerateData extends Command
     }
 
     /**
+     * Display a summary table of the generated rows.
+     *
      * @return void
      */
     private function review()
@@ -273,6 +281,8 @@ class GenerateData extends Command
     }
 
     /**
+     * Display a detailed table of an individual generated row.
+     *
      * @param array $row
      */
     private function rowDetails(array $row)
