@@ -223,10 +223,18 @@ class GenerateData extends Command
         }
     }
 
+    /**
+     * @param array $data
+     */
     private function modifyData(array $data)
     {
-        $this->table($this->columns->pluck('name')->toArray(), $data);
+        $rows = array_map(function ($row) {
+            return array_map(function ($column) {
+                return is_string($column) && strlen($column) > 10 ? substr($column, 0, 10) : $column;
+            }, $row);
+        }, $data);
 
+        $this->table($this->columns->pluck('name')->toArray(), $rows);
     }
 
     /**
