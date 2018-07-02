@@ -225,7 +225,7 @@ class GenerateData extends Command
     private function modifyData(array $data)
     {
         $this->table($this->columns->toArray(), $data);
-        
+
     }
 
     /**
