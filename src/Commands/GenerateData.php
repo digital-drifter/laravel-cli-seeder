@@ -52,14 +52,9 @@ class GenerateData extends Command
     protected $tables;
 
     /**
-     * @var string[]
-     */
-    protected $columns;
-
-    /**
      * @var Collection
      */
-    protected $columnDefinitions;
+    protected $columns;
 
     /**
      * @var Generator
@@ -128,32 +123,58 @@ class GenerateData extends Command
      */
     public function handle()
     {
-        $this->comment('Begin typing for autocompletion. Use the up/down arrows to select previous or next entry.');
+        $this->parentSelectPrompt();
+        $this->tableSelectPrompt();
+        $this->mapTableColumns();
+        $this->generate();
+    }
 
-        $name = $this->anticipate('Parent Model', $this->parents->pluck(static::displayName())->toArray());
-
-        if (!$this->parents->contains(static::displayName(), $name)) {
-            $this->error(sprintf('Parent model %s \'%s\' is invalid. Exiting.', static::displayName(), $name));
-            exit();
+    /**
+     * @return void
+     */
+    private function parentSelectPrompt()
+    {
+        if (is_null($this->parents)) {
+            $this->warn(sprintf('The parent model configuration option is invalid. Config value: %s.', static::model()));
+            if (!$this->confirm('Continue')) {
+                $this->comment('Set the parent model in config/cli-seeder.php.');
+                exit();
+            }
+        } else {
+            $this->comment('Begin typing for autocompletion. Use the up/down arrows to select previous or next entry.');
+            $name = $this->anticipate(sprintf('Select %s', static::model()), $this->parents->pluck(static::displayName())->toArray());
+            if (!$this->parents->contains(static::displayName(), $name)) {
+                $this->error(sprintf('Parent model %s \'%s\' is invalid. Exiting.', static::displayName(), $name));
+                exit();
+            }
+            $this->parent = $this->parents->firstWhere(static::displayName(), $name);
         }
+    }
 
+    /**
+     * @return void
+     */
+    private function tableSelectPrompt()
+    {
         $this->table = $this->anticipate('For which table?', $this->tables->toArray());
 
         if (!$this->tables->contains($this->table)) {
             $this->error(sprintf('Table name \'%s\' is invalid. Exiting.', $this->table));
             exit();
         }
+    }
 
-        $this->parent            = $this->parents->firstWhere(static::displayName(), $name);
-        $this->columns           = Schema::getColumnListing($this->table);
-        $this->columnDefinitions = collect($this->columns)->map(function (string $column) {
+    /**
+     * @return void
+     */
+    private function mapTableColumns()
+    {
+        $this->columns = collect(Schema::getColumnListing($this->table))->map(function (string $column) {
             return [
                 'column' => $column,
                 'type'   => Schema::getColumnType($this->table, $column)
             ];
         });
-
-        $this->generate();
     }
 
     /**
@@ -176,7 +197,7 @@ class GenerateData extends Command
 
         DB::table($this->table)->insert($data);
 
-        $this->info(sprintf('Added %d rows to %s for parent model %s.', $count, $this->table, $this->parent->getAttribute('name')));
+        $this->info(sprintf('Added %d rows to %s for parent model %s.', $count, $this->table, $this->getParentModelIdentifier()));
     }
 
     /**
@@ -187,29 +208,29 @@ class GenerateData extends Command
      */
     private function generateData(int $count, array &$data)
     {
-        $maxId = DB::table($this->table)->max('id');
-
         do {
-            $data[] = $this->columnDefinitions->reduce(function (array $attributes, array $item) use (&$maxId) {
+            $data[] = $this->columns->reduce(function (array $attributes, array $item) {
                 // handle the special cases for a column when setting the value, defaulting to Faker generated data based
                 // on the column data type.
                 switch (true) {
-                    case $item['column'] === 'id':
-                        return data_set($attributes, 'id', ++$maxId);
+                    case $item['column'] === static::primaryKey():
+                        return data_set($attributes, $item['column'], $this->getMaxId());
                         break;
-                    case $item['column'] === $this->parent->getForeignKey():
-                        return data_set($attributes, $this->parent->getForeignKey(), $this->parent->getKey());
+                    case $item['column'] === $this->getParentForeignKeyName():
+                        return data_set($attributes, $item['column'], $this->getParentPrimaryKey());
                         break;
-                    case ends_with($item['column'], '_id'):
+                    case ends_with($item['column'], sprintf('_%s', static::primaryKey())):
                         // attempt to find a matching foreign key constraint based on the column name. If a match is found, then
                         // check if it has a column matching the events table foreign key so a related record can be used
                         // as the foreign relation for the current iteration data. Otherwise, set the column value based on the data type.
                         if (!is_null($foreign = $this->findMatchingForeignConstraint($item['column']))) {
-                            if (in_array($this->parent->getForeignKey(), Schema::getColumnListing($foreign->getForeignTableName()))) {
-                                $record = DB::table($foreign->getForeignTableName())->where($this->parent->getForeignKey(), $this->parent->getKey())->first();
-
-                                return data_set($attributes, $item['column'], $record->id);
+                            if ($this->tableColumnMatchesParentForeignKeyName($foreign)) {
+                                $record = DB::table($foreign->getForeignTableName())->where($this->getParentForeignKeyName(), $this->getParentPrimaryKey())->inRandomOrder()->first();
+                            } else {
+                                $record = DB::table($foreign->getForeignTableName())->whereNotNull($item['column'])->inRandomOrder()->first();
                             }
+
+                            return data_set($attributes, $item['column'], $record->id);
                         };
 
                         return data_set($attributes, $item['column'], $this->getValueForDataType($item['type']));
@@ -281,6 +302,54 @@ class GenerateData extends Command
             default:
                 return null;
         }
+    }
+
+    /**
+     * @return int
+     */
+    private function getMaxId()
+    {
+        static $maxId;
+
+        if (!$maxId) {
+            $maxId = DB::table($this->table)->max(static::primaryKey());
+        }
+
+        return ++$maxId;
+    }
+
+    /**
+     * @return string|null
+     */
+    private function getParentModelIdentifier()
+    {
+        return !is_null($this->parent) ? $this->parent->getAttribute(static::displayName()) : null;
+    }
+
+    /**
+     * @param ForeignKeyConstraint $foreign
+     *
+     * @return bool
+     */
+    private function tableColumnMatchesParentForeignKeyName(ForeignKeyConstraint $foreign)
+    {
+        return !is_null($this->parent) && in_array($this->getParentForeignKeyName(), Schema::getColumnListing($foreign->getForeignTableName()));
+    }
+
+    /**
+     * @return string|null
+     */
+    private function getParentForeignKeyName()
+    {
+        return !is_null($this->parent) ? $this->parent->getForeignKey() : null;
+    }
+
+    /**
+     * @return int|null
+     */
+    private function getParentPrimaryKey()
+    {
+        return !is_null($this->parent) ? $this->parent->getKey() : null;
     }
 
     /**
