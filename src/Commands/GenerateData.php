@@ -136,6 +136,16 @@ class GenerateData extends Command
     }
 
     /**
+     * @param string $type
+     *
+     * @return array|null
+     */
+    public static function getOptionsForDataType(string $type)
+    {
+        return config(sprintf('cli-seeder.faker.data_types.%s', $type), null);
+    }
+
+    /**
      * Execute the console command.
      *
      * @return void
@@ -219,16 +229,16 @@ class GenerateData extends Command
      */
     private function postGenerate()
     {
-        $action = $this->choice('Data prepared. Would you like to:', ['Insert', 'Review', 'Discard']);
+        $action = $this->choice('Data prepared. Would you like to:', ['Insert Now', 'Review and Edit', 'Discard and Exit']);
 
         switch ($action) {
-            case 'Insert':
+            case 'Insert Now':
                 $this->insert();
                 break;
-            case 'Review':
+            case 'Review and Edit':
                 $this->review();
                 break;
-            case 'Discard':
+            case 'Discard and Exit':
                 $this->info('Discarded all data. No records added. Exiting.');
                 exit();
                 break;
@@ -273,7 +283,7 @@ class GenerateData extends Command
 
         $this->table(['Column', 'Value'], $rows);
 
-        $column = $this->anticipate('Edit Column', array_merge(['None'], $this->columns->pluck('column')->toArray()));
+        $column = $this->anticipate('Edit Column. Type \'None\' to go back.', array_merge(['None'], $this->columns->pluck('column')->toArray()));
 
         if ($column !== 'None') {
             $value = $this->ask(sprintf('Enter value for %s', $column));
@@ -291,6 +301,8 @@ class GenerateData extends Command
     }
 
     /**
+     * Perform the data insertion.
+     *
      * @return void
      */
     private function insert()
@@ -301,6 +313,8 @@ class GenerateData extends Command
     }
 
     /**
+     * Generate the data to be inserted for the selected table.
+     *
      * @return void
      */
     private function generateData()
@@ -313,10 +327,10 @@ class GenerateData extends Command
                 // on the column data type.
                 switch (true) {
                     case $item['column'] === static::primaryKey():
-                        return data_set($attributes, $item['column'], $this->getMaxId());
+                        $value = $this->getMaxId();
                         break;
                     case $item['column'] === $this->getParentForeignKeyName():
-                        return data_set($attributes, $item['column'], $this->getParentPrimaryKey());
+                        $value = $this->getParentPrimaryKey();
                         break;
                     case ends_with($item['column'], sprintf('_%s', static::primaryKey())):
                         // attempt to find a matching foreign key constraint based on the column name. If a match is found, then
@@ -329,53 +343,55 @@ class GenerateData extends Command
                                 $record = DB::table($foreign->getForeignTableName())->whereNotNull($item['column'])->inRandomOrder()->first();
                             }
 
-                            return data_set($attributes, $item['column'], $record->id);
-                        };
-
-                        return data_set($attributes, $item['column'], $this->getValueForDataType($item['type']));
+                            $value = $record->id;
+                        } else {
+                            $value = $this->getValueForDataType($item['type']);
+                        }
                         break;
                     case str_contains($item['column'], 'facebook_id'):
-                        return data_set($attributes, $item['column'], $this->faker->randomNumber(15));
+                        $value = $this->faker->randomNumber(15);
                         break;
                     case str_contains($item['column'], ['guid', 'uuid']):
-                        return data_set($attributes, $item['column'], Str::uuid());
+                        $value = Str::uuid();
                         break;
                     case str_contains($item['column'], 'email'):
-                        return data_set($attributes, $item['column'], $this->faker->safeEmail);
+                        $value = $this->faker->safeEmail;
                         break;
                     case str_contains($item['column'], 'first_name'):
-                        return data_set($attributes, $item['column'], $this->faker->firstName);
+                        $value = $this->faker->firstName;
                         break;
                     case str_contains($item['column'], 'last_name'):
-                        return data_set($attributes, $item['column'], $this->faker->lastName);
+                        $value = $this->faker->lastName;
                         break;
                     case str_contains($item['column'], 'city'):
-                        return data_set($attributes, $item['column'], $this->faker->city);
+                        $value = $this->faker->city;
                         break;
                     case str_contains($item['column'], 'state'):
-                        return data_set($attributes, $item['column'], $this->faker->state());
+                        $value = $this->faker->state();
                         break;
                     case str_contains($item['column'], 'country'):
-                        return data_set($attributes, $item['column'], $this->faker->country());
+                        $value = $this->faker->country();
                         break;
                     case str_contains($item['column'], ['zipcode', 'zip_code', 'postal']):
-                        return data_set($attributes, $item['column'], $this->faker->postcode);
+                        $value = $this->faker->postcode;
                         break;
                     case str_contains($item['column'], 'company'):
-                        return data_set($attributes, $item['column'], $this->faker->company);
+                        $value = $this->faker->company;
                         break;
                     case str_contains($item['column'], 'address'):
-                        return data_set($attributes, $item['column'], $this->faker->streetAddress);
+                        $value = $this->faker->streetAddress;
                         break;
                     case str_contains($item['column'], 'phone'):
-                        return data_set($attributes, $item['column'], $this->faker->phoneNumber);
+                        $value = $this->faker->phoneNumber;
                         break;
                     case str_contains($item['column'], ['hyperlink', 'url']):
-                        return data_set($attributes, $item['column'], $this->faker->url);
+                        $value = $this->faker->url;
                         break;
                     default:
-                        return data_set($attributes, $item['column'], $this->getValueForDataType($item['type']));
+                        $value = $this->getValueForDataType($item['type']);
                 }
+
+                return data_set($attributes, $item['column'], $value);
             }, []);
         } while (--$count > 0);
     }
@@ -388,26 +404,29 @@ class GenerateData extends Command
      */
     private function getValueForDataType(string $type)
     {
+        $options = static::getOptionsForDataType($type);
+
         switch ($type) {
             case 'bigint':
-                return $this->faker->randomDigitNotNull;
+                return random_int(data_get($options, 'min', PHP_INT_MIN), data_get($options, 'max', PHP_INT_MAX));
                 break;
             case 'boolean':
                 return $this->faker->boolean;
                 break;
             case 'date':
-                return $this->faker->dateTimeBetween('-6 months', 'now')->format('Y-m-d');
-                break;
             case 'datetime':
-                return $this->faker->dateTimeBetween('-6 months', 'now')->format('Y-m-d H:m:s');
+                return $this->faker->dateTimeBetween(data_get($options, 'range.from', '-6 months'), data_get($options, 'range.to', 'now'))
+                                   ->format(data_get($options, 'format', $type === 'date' ? 'Y-m-d' : 'Y-m-d H:m:s'));
                 break;
             case 'string':
-                return $this->faker->words(random_int(1, 3), true);
-                break;
             case 'text':
-                return $this->faker->paragraphs(random_int(1, 3), true);
+                $method = $type === 'string' ? 'words' : 'paragraphs';
+
+                return $this->faker->$method(random_int(data_get($options, sprintf('%s.min', $method), 1), data_get($options, sprintf('%s.max', $method), 3)), true);
                 break;
             default:
+                $this->warn(sprintf('Unsupported data type: %s. Using value \'null\'.', $type));
+
                 return null;
         }
     }
