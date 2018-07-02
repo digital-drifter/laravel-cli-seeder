@@ -1,6 +1,6 @@
 <?php
 
-namespace DigitalDrifter\Models;
+namespace DigitalDrifter\LaravelCliSeeder\Models;
 
 use Illuminate\Database\Eloquent\Model;
 

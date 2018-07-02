@@ -1,6 +1,6 @@
 <?php
 
-use DigitalDrifter\Models\Dummy;
+use DigitalDrifter\LaravelCliSeeder\Models\Dummy;
 
 return [
     /**
