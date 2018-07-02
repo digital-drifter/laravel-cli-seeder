@@ -2,6 +2,7 @@
 
 namespace DigitalDrifter\LaravelCliSeeder\Commands;
 
+use DigitalDrifter\LaravelCliSeeder\Models\Dummy;
 use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use Doctrine\DBAL\Schema\ForeignKeyConstraint;
@@ -79,11 +80,37 @@ class GenerateData extends Command
             static::doctrine()->getDatabasePlatform()->registerDoctrineTypeMapping('enum', 'string');
         }
 
-        $this->parents = app(config('cli-seeder.parent.model'))->all([config('cli-seeder.parent.primary_key'), config('cli-seeder.parent.display_name')]);
-        $this->tables  = collect(static::doctrine()->listTables())->map->getName();
-        $this->faker   = app(Generator::class);
+        if ((static::model() !== Dummy::class) && !is_null(static::model())) {
+            $this->parents = app(static::model())->all([static::primaryKey(), static::displayName()]);
+            $this->tables  = collect(static::doctrine()->listTables())->map->getName();
+            $this->faker   = app(Generator::class);
 
-        $this->faker->addProvider(new Address($this->faker));
+            $this->faker->addProvider(new Address($this->faker));
+        }
+    }
+
+    /**
+     * @return string|null
+     */
+    public static function model()
+    {
+        return config('cli-seeder.parent.model', null);
+    }
+
+    /**
+     * @return string
+     */
+    public static function primaryKey()
+    {
+        return config('cli-seeder.parent.primary_key', 'id');
+    }
+
+    /**
+     * @return string
+     */
+    public static function displayName()
+    {
+        return config('cli-seeder.parent.display_name', 'name');
     }
 
     /**
@@ -103,10 +130,10 @@ class GenerateData extends Command
     {
         $this->comment('Begin typing for autocompletion. Use the up/down arrows to select previous or next entry.');
 
-        $name = $this->anticipate('Parent Model', $this->parents->pluck(config('cli-seeder.model.display_name'))->toArray());
+        $name = $this->anticipate('Parent Model', $this->parents->pluck(static::displayName())->toArray());
 
-        if (!$this->parents->contains(config('cli-seeder.model.display_name'), $name)) {
-            $this->error(sprintf('Parent model %s \'%s\' is invalid. Exiting.', config('cli-seeder.model.display_name'), $name));
+        if (!$this->parents->contains(static::displayName(), $name)) {
+            $this->error(sprintf('Parent model %s \'%s\' is invalid. Exiting.', static::displayName(), $name));
             exit();
         }
 
@@ -117,7 +144,7 @@ class GenerateData extends Command
             exit();
         }
 
-        $this->parent            = $this->parents->firstWhere(config('cli-seeder.model.display_name'), $name);
+        $this->parent            = $this->parents->firstWhere(static::displayName(), $name);
         $this->columns           = Schema::getColumnListing($this->table);
         $this->columnDefinitions = collect($this->columns)->map(function (string $column) {
             return [
@@ -149,7 +176,7 @@ class GenerateData extends Command
 
         DB::table($this->table)->insert($data);
 
-        $this->info(sprintf('Added %d rows to %s for parent model %s.', $count, $this->table, $this->event->getAttribute('name')));
+        $this->info(sprintf('Added %d rows to %s for parent model %s.', $count, $this->table, $this->parent->getAttribute('name')));
     }
 
     /**
