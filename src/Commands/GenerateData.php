@@ -165,6 +165,8 @@ class GenerateData extends Command
     }
 
     /**
+     * Prompt the user to selct the parent record.
+     *
      * @return void
      */
     private function parentSelectPrompt()
@@ -187,6 +189,8 @@ class GenerateData extends Command
     }
 
     /**
+     * Prompt the user to select the table.
+     *
      * @return void
      */
     private function tableSelectPrompt()
@@ -200,6 +204,8 @@ class GenerateData extends Command
     }
 
     /**
+     * Create a mapping of columns and types.
+     *
      * @return void
      */
     private function mapTableColumns()
@@ -231,6 +237,8 @@ class GenerateData extends Command
     }
 
     /**
+     * Prompt the user which action to take after generating the data.
+     *
      * @return void
      */
     private function postGenerate()
