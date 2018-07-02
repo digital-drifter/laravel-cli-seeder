@@ -27,7 +27,7 @@ class ServiceProvider extends BaseServiceProvider
     public function boot()
     {
         $this->publishes([
-            __DIR__ . '/../config/config.php' => config_path($this->packageName . '.php'),
+            __DIR__ . '/../config/cli-seeder.php' => config_path($this->packageName . '.php'),
         ], 'config');
 
         if ($this->app->runningInConsole()) {
@@ -43,7 +43,7 @@ class ServiceProvider extends BaseServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/config.php', $this->packageName
+            __DIR__ . '/../config/cli-seeder.php', $this->packageName
         );
     }
 }
