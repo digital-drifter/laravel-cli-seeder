@@ -61,6 +61,16 @@ class GenerateData extends Command
     protected $faker;
 
     /**
+     * @var array
+     */
+    protected $data = [];
+
+    /**
+     * @var int
+     */
+    protected $count;
+
+    /**
      * Create a new command instance.
      *
      * @throws DBALException
@@ -193,25 +203,30 @@ class GenerateData extends Command
      */
     private function generate()
     {
-        $data = [];
+        $this->count = intval($this->ask('Number of rows to generate', 1));
 
-        $count = intval($this->ask('Number of rows to generate', 1));
-
-        if (!is_int($count) || ($count <= 0)) {
-            $this->error(sprintf('Invalid number of rows: %s. Must be an integer greater than zero. Exiting.', $count));
+        if (!is_int($this->count) || ($this->count <= 0)) {
+            $this->error(sprintf('Invalid number of rows: %s. Must be an integer greater than zero. Exiting.', $this->count));
             exit();
         }
 
-        $this->generateData($count, $data);
+        $this->generateData();
+        $this->postGenerate();
+    }
 
+    /**
+     * @return void
+     */
+    private function postGenerate()
+    {
         $action = $this->choice('Data prepared. Would you like to:', ['Insert', 'Review', 'Discard']);
 
         switch ($action) {
             case 'Insert':
-                $this->insert($count, $data);
+                $this->insert();
                 break;
             case 'Review':
-                $this->review($data);
+                $this->review();
                 break;
             case 'Discard':
                 $this->info('Discarded all data. No records added. Exiting.');
@@ -224,57 +239,76 @@ class GenerateData extends Command
     }
 
     /**
-     * @param array $data
+     * @return void
      */
-    private function review(array $data)
+    private function review()
     {
         $rows = array_map(function ($row) {
             return array_map(function ($column) {
                 return is_string($column) && strlen($column) > 10 ? substr($column, 0, 10) . '...' : $column;
             }, $row);
-        }, $data);
+        }, $this->data);
 
         $this->table($this->columns->pluck('column')->toArray(), $rows);
 
         $id = $this->choice('Modify Row', array_map(function ($row) {
-            return $row[0];
+            return $row['id'];
         }, $rows));
 
-        $row = array_first($rows, function ($row) use ($id) {
-            return $row[0] === $id;
+        $row = array_first($this->data, function ($row) use ($id) {
+            return $row['id'] === intval($id);
         });
 
         $this->rowDetails($row);
     }
 
+    /**
+     * @param array $row
+     */
     private function rowDetails(array $row)
     {
-        $rows = array_combine($this->columns->pluck('column')->toArray(), $row);
+        $rows = array_map(function ($key, $value) {
+            return [$key, $value];
+        }, array_keys($row), array_values($row));
 
         $this->table(['Column', 'Value'], $rows);
+
+        $column = $this->anticipate('Edit Column', array_merge(['None'], $this->columns->pluck('column')->toArray()));
+
+        if ($column !== 'None') {
+            $value = $this->ask(sprintf('Enter value for %s', $column));
+
+            $index = collect($this->data)->search(function (array $datum) use ($row) {
+                return $datum['id'] === $row['id'];
+            });
+
+            $this->data[$index][$column] = $value;
+
+            $this->rowDetails($this->data[$index]);
+        } else {
+            $this->postGenerate();
+        }
     }
 
     /**
-     * @param int $count
-     * @param array $data
-     */
-    private function insert(int $count, array $data)
-    {
-        DB::table($this->table)->insert($data);
-
-        $this->info(sprintf('Added %d rows to %s for parent model %s.', $count, $this->table, $this->getParentModelIdentifier()));
-    }
-
-    /**
-     * @param int $count
-     * @param array $data
-     *
      * @return void
      */
-    private function generateData(int $count, array &$data)
+    private function insert()
     {
+        DB::table($this->table)->insert($this->data);
+
+        $this->info(sprintf('Added %d rows to %s for parent model %s.', $this->count, $this->table, $this->getParentModelIdentifier()));
+    }
+
+    /**
+     * @return void
+     */
+    private function generateData()
+    {
+        $count = $this->count;
+
         do {
-            $data[] = $this->columns->reduce(function (array $attributes, array $item) {
+            $this->data[] = $this->columns->reduce(function (array $attributes, array $item) {
                 // handle the special cases for a column when setting the value, defaulting to Faker generated data based
                 // on the column data type.
                 switch (true) {
