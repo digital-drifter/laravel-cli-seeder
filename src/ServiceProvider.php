@@ -2,7 +2,7 @@
 
 namespace DigitalDrifter\LaravelCliSeeder;
 
-use DigitalDrifter\Console\Commands\GenerateData;
+use DigitalDrifter\LaravelCliSeeder\Commands\GenerateData;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 
 class ServiceProvider extends BaseServiceProvider
