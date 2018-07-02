@@ -204,16 +204,16 @@ class GenerateData extends Command
 
         $this->generateData($count, $data);
 
-        $action = $this->choice('Data prepared. Would you like to:', ['Insert records', 'Modify data', 'Discard']);
+        $action = $this->choice('Data prepared. Would you like to:', ['Insert', 'Modify', 'Discard']);
 
         switch ($action) {
-            case 'I':
+            case 0:
                 $this->insertData($count, $data);
                 break;
-            case 'M':
+            case 1:
                 $this->modifyData($data);
                 break;
-            case 'D':
+            case 2:
                 $this->info('Discarded all data. No records added. Exiting.');
                 exit();
                 break;
@@ -278,7 +278,7 @@ class GenerateData extends Command
                     case str_contains($item['column'], 'facebook_id'):
                         return data_set($attributes, $item['column'], $this->faker->randomNumber(15));
                         break;
-                    case str_contains($item['column'], 'guid'):
+                    case str_contains($item['column'], ['guid', 'uuid']):
                         return data_set($attributes, $item['column'], Str::uuid());
                         break;
                     case str_contains($item['column'], 'email'):
