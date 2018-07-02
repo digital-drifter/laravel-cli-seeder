@@ -7,7 +7,6 @@ use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use Doctrine\DBAL\Schema\ForeignKeyConstraint;
 use Faker\Generator;
-use Faker\Provider\en_US\Address;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -80,8 +79,18 @@ class GenerateData extends Command
             $this->tables  = collect(static::doctrine()->listTables())->map->getName();
             $this->faker   = app(Generator::class);
 
-            $this->faker->addProvider(new Address($this->faker));
+            foreach (static::providers() as $provider) {
+                $this->faker->addProvider(app()->makeWith($provider, ['generator' => $this->faker]));
+            }
         }
+    }
+
+    /**
+     * @return array
+     */
+    public static function providers()
+    {
+        return config('cli-seeder.faker.providers', []);
     }
 
     /**
@@ -195,6 +204,36 @@ class GenerateData extends Command
 
         $this->generateData($count, $data);
 
+        $action = $this->choice('Ready. (I)nsert, (M)odify, (D)iscard?', ['I', 'M', 'D']);
+
+        switch ($action) {
+            case 'I':
+                $this->insertData($count, $data);
+                break;
+            case 'M':
+                $this->modifyData($data);
+                break;
+            case 'D':
+                $this->insertData($count, $data);
+                break;
+            default:
+                $this->error('Invalid choice. Exiting.');
+                exit();
+        }
+    }
+
+    private function modifyData(array $data)
+    {
+        $this->table($this->columns->toArray(), $data);
+        
+    }
+
+    /**
+     * @param int $count
+     * @param array $data
+     */
+    private function insertData(int $count, array $data)
+    {
         DB::table($this->table)->insert($data);
 
         $this->info(sprintf('Added %d rows to %s for parent model %s.', $count, $this->table, $this->getParentModelIdentifier()));

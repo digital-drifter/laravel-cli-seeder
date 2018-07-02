@@ -1,6 +1,7 @@
 <?php
 
 use DigitalDrifter\LaravelCliSeeder\Models\Dummy;
+use Faker\Provider\en_US\Address;
 
 return [
     /**
@@ -32,6 +33,8 @@ return [
      * Set defaults for Faker when creating data.
      */
     'faker'  => [
-        'providers' => []
+        'providers' => [
+            Address::class
+        ]
     ]
 ];
