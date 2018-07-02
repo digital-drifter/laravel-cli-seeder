@@ -259,11 +259,20 @@ class GenerateData extends Command
                     case str_contains($item['column'], 'country'):
                         return data_set($attributes, $item['column'], $this->faker->country());
                         break;
-                    case str_contains($item['column'], 'zipcode'):
+                    case str_contains($item['column'], ['zipcode', 'zip_code', 'postal']):
                         return data_set($attributes, $item['column'], $this->faker->postcode);
                         break;
                     case str_contains($item['column'], 'company'):
                         return data_set($attributes, $item['column'], $this->faker->company);
+                        break;
+                    case str_contains($item['column'], 'address'):
+                        return data_set($attributes, $item['column'], $this->faker->streetAddress);
+                        break;
+                    case str_contains($item['column'], 'phone'):
+                        return data_set($attributes, $item['column'], $this->faker->phoneNumber);
+                        break;
+                    case str_contains($item['column'], ['hyperlink', 'url']):
+                        return data_set($attributes, $item['column'], $this->faker->url);
                         break;
                     default:
                         return data_set($attributes, $item['column'], $this->getValueForDataType($item['type']));
