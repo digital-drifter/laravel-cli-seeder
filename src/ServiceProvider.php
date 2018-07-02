@@ -1,5 +1,7 @@
 <?php
 
+namespace DigitalDrifter\LaravelCliSeeder;
+
 use DigitalDrifter\Console\Commands\GenerateData;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 
