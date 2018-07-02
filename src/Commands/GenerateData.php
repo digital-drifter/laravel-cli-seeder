@@ -1,6 +1,6 @@
 <?php
 
-namespace DigitalDrifter\Console\Commands;
+namespace DigitalDrifter\LaravelCliSeeder\Commands;
 
 use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
@@ -117,7 +117,7 @@ class GenerateData extends Command
             exit();
         }
 
-        $this->parent             = $this->parents->firstWhere(config('cli-seeder.model.display_name'), $name);
+        $this->parent            = $this->parents->firstWhere(config('cli-seeder.model.display_name'), $name);
         $this->columns           = Schema::getColumnListing($this->table);
         $this->columnDefinitions = collect($this->columns)->map(function (string $column) {
             return [
