@@ -207,13 +207,13 @@ class GenerateData extends Command
         $action = $this->choice('Data prepared. Would you like to:', ['Insert', 'Modify', 'Discard']);
 
         switch ($action) {
-            case 0:
+            case 'Insert':
                 $this->insertData($count, $data);
                 break;
-            case 1:
+            case 'Modify':
                 $this->modifyData($data);
                 break;
-            case 2:
+            case 'Discard':
                 $this->info('Discarded all data. No records added. Exiting.');
                 exit();
                 break;
